@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('logo.png') }}">
     <title>@yield('title', 'Commerce AI — Feed Validator')</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -40,8 +43,8 @@
         {{-- Sidebar --}}
         <aside class="hidden lg:flex flex-col w-60 glass-dark shrink-0">
             <div class="p-5 border-b border-white/5">
-                <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold shadow-lg shadow-indigo-500/20">⚡</div>
+                <div class="brand-logo-row flex items-center gap-2.5">
+                    <img src="{{ asset('logo.png') }}" alt="Commerce AI logo" class="w-8 h-8 rounded-lg object-cover shadow-lg shadow-cyan-500/15">
                     <div>
                         <p class="text-xs font-bold text-white leading-none">Commerce AI</p>
                         <p class="text-[10px] text-indigo-400 mt-0.5">Feed Validator</p>

@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('logo.png') }}">
     <title>Commerce AI — Feed Validator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
-        .gradient-text { background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .gradient-text { background: linear-gradient(135deg, #58a6ff, #39d0d8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-4">
@@ -17,10 +20,9 @@
 
     <div class="max-w-lg w-full text-center space-y-8">
 
-        <div class="space-y-4">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl mx-auto shadow-2xl shadow-indigo-500/20">
-                ⚡
-            </div>
+        <div class="landing-logo-stack space-y-4">
+            <img src="{{ asset('logo.png') }}" alt="Commerce AI logo"
+                 class="w-16 h-16 rounded-2xl object-cover mx-auto shadow-2xl shadow-cyan-500/20">
             <h1 class="text-4xl font-bold tracking-tight">
                 <span class="gradient-text">Commerce AI</span>
             </h1>

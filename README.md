@@ -1,58 +1,186 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Commerce AI Feed Validator
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Commerce AI Feed Validator is a Laravel app for uploading product feeds, finding feed-quality issues, applying Gemini-powered fixes, and exporting cleaned CSV files.
 
-## About Laravel
+The app supports Google Merchant-style product feed validation and includes Magento-aware export handling for product import CSVs.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- GitHub OAuth login with Laravel Socialite
+- CSV, TSV, TXT, and XML feed uploads
+- Background feed processing through Laravel queues
+- Product row validation for required fields, URLs, availability, price, identifiers, category, and condition
+- Gemini AI fix suggestions per invalid row
+- Apply AI fixes and revalidate rows in place
+- Export cleaned CSV data
+- Magento product import support for numeric `price` export values
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Requirements
 
-## Learning Laravel
+- PHP 8.3+
+- Composer
+- Node.js and npm
+- SQLite, MySQL, or another Laravel-supported database
+- Gemini API key for AI suggestions
+- GitHub OAuth app credentials for login
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Installation
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+npm run build
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+For local development with Laravel's built-in server, queue listener, logs, and Vite:
 
-## Contributing
+```bash
+composer run dev
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+If you are using Laragon, point your local site to the project root and make sure the document root resolves to `public/`.
 
-## Code of Conduct
+## Environment
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Configure these values in `.env`:
 
-## Security Vulnerabilities
+```env
+APP_NAME="Commerce AI"
+APP_URL=http://laravelfeed.test
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+DB_CONNECTION=sqlite
 
-## License
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_REDIRECT_URI=http://laravelfeed.test/auth/github/callback
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+
+QUEUE_CONNECTION=database
+```
+
+If using SQLite, create the database file before migrating:
+
+```bash
+type nul > database\database.sqlite
+php artisan migrate
+```
+
+For queued processing, keep a worker running:
+
+```bash
+php artisan queue:listen --tries=1 --timeout=0
+```
+
+## Usage
+
+1. Open the app in your browser.
+2. Sign in with GitHub.
+3. Go to `My Feeds`.
+4. Click `Upload Feed`.
+5. Upload a CSV, TSV, TXT, or XML feed.
+6. Wait for processing to finish.
+7. Review rows with validation issues.
+8. Click `Suggest Fix` to request a Gemini correction.
+9. Review the suggested JSON and click `Apply AI Fix`.
+10. Export the cleaned CSV when all rows are valid.
+
+## Validation Rules
+
+The validator checks:
+
+- Required fields: `id`, `title`, `description`, `link`, `image_link`, `availability`, `price`, and `brand`
+- URL format and HTTPS usage
+- Image URL extension
+- Accepted availability values
+- Price format
+- Product ID spacing and length
+- Missing GTIN or MPN
+- Missing Google product category
+- Missing condition
+
+Magento import rows are detected by the presence of columns such as `sku`, `attribute_set_code`, `product_type`, and `product_websites`.
+
+## Magento Import Notes
+
+Magento product import expects the `price` column to be numeric, for example:
+
+```csv
+price
+14.00
+```
+
+Google Merchant feeds commonly use currency-suffixed prices:
+
+```csv
+price
+14.00 USD
+```
+
+When exporting Magento-style rows, this app normalizes `price` values by removing currency suffixes, so Magento can import them.
+
+## AI Fix Behavior
+
+Gemini suggestions are stored on each row and can be reviewed before applying. After applying a fix:
+
+- The row is revalidated
+- Remaining issues are updated
+- Valid rows turn green
+- Rows with no issues show `All fixed`
+- Feed counts and health score update in the UI
+
+If Gemini returns a rate limit or temporary service error, the UI starts an automatic retry countdown. Invalid API key errors are shown as final errors.
+
+## Testing
+
+Run the full test suite:
+
+```bash
+php artisan test
+```
+
+Run a focused test:
+
+```bash
+php artisan test --filter=AiFixApplyTest
+```
+
+## Important Files
+
+- `app/Services/FeedValidatorService.php` - feed validation rules
+- `app/Services/GeminiService.php` - Gemini request and response handling
+- `app/Http/Controllers/FeedController.php` - upload, status, export, and delete actions
+- `app/Http/Controllers/AiFixController.php` - AI suggest/apply/manual fix actions
+- `app/Jobs/ProcessFeedJob.php` - background feed parsing and validation
+- `resources/views/dashboard.blade.php` - feed list and upload modal
+- `resources/views/feeds/show.blade.php` - row review and AI fix UI
+
+## Troubleshooting
+
+### Upload button does not open
+
+Hard refresh the dashboard so the latest Blade output is loaded. The top-right upload button dispatches a browser event that opens the dashboard upload modal.
+
+### Feed stays in pending or processing
+
+Start the queue worker:
+
+```bash
+php artisan queue:listen --tries=1 --timeout=0
+```
+
+### Gemini fix does not return
+
+Check:
+
+- `GEMINI_API_KEY` is set
+- Gemini quota is available
+- `storage/logs/laravel.log` for API errors
+
+### Magento says price is invalid
+
+Use a cleaned export generated after the Magento price normalization change. Magento needs `14.00`, not `14.00 USD`, in the `price` column.
