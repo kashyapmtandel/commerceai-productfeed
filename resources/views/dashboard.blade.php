@@ -3,7 +3,7 @@
 @section('heading', 'My Feeds')
 
 @section('header-actions')
-<button @click="uploadOpen = true"
+<button type="button" onclick="window.dispatchEvent(new CustomEvent('open-upload-modal'))"
         class="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-all shadow-sm shadow-indigo-500/20">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -17,7 +17,7 @@
     uploadOpen: false,
     dragOver: false,
     file: null,
-}">
+}" @open-upload-modal.window="uploadOpen = true">
 
 {{-- Upload Modal --}}
 <template x-teleport="body">

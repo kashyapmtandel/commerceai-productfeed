@@ -17,24 +17,48 @@
 
 @section('content')
 
+<div x-data="{
+    rowCount: @js($feed->row_count),
+    errorCount: @js($feed->error_count),
+    warningCount: @js($feed->warning_count),
+    healthScore() {
+        if (this.rowCount === 0) return 0;
+        const bad = this.errorCount + (this.warningCount * 0.5);
+        return Math.max(0, Math.round(100 - ((bad / this.rowCount) * 100)));
+    },
+    healthScoreColor() {
+        if (this.healthScore() >= 80) return 'text-emerald-400';
+        if (this.healthScore() >= 50) return 'text-yellow-400';
+        return 'text-red-400';
+    },
+    updateFeedStatusCounts(fromStatus, toStatus) {
+        if (fromStatus === toStatus) return;
+        if (fromStatus === 'error') this.errorCount = Math.max(0, this.errorCount - 1);
+        if (fromStatus === 'warning') this.warningCount = Math.max(0, this.warningCount - 1);
+        if (toStatus === 'error') this.errorCount++;
+        if (toStatus === 'warning') this.warningCount++;
+    }
+}">
+
 {{-- Summary cards --}}
 @if($feed->status === 'done')
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-    @php
-        $cards = [
-            ['label' => 'Total Products', 'value' => number_format($feed->row_count),   'color' => 'text-white'],
-            ['label' => 'Errors',          'value' => number_format($feed->error_count),   'color' => 'text-red-400'],
-            ['label' => 'Warnings',        'value' => number_format($feed->warning_count), 'color' => 'text-yellow-400'],
-            ['label' => 'Health Score',    'value' => $feed->health_score . '%',
-             'color' => $feed->health_score >= 80 ? 'text-emerald-400' : ($feed->health_score >= 50 ? 'text-yellow-400' : 'text-red-400')],
-        ];
-    @endphp
-    @foreach($cards as $card)
     <div class="glass rounded-xl p-4 text-center">
-        <p class="text-xl font-bold {{ $card['color'] }}">{{ $card['value'] }}</p>
-        <p class="text-[11px] text-gray-600 mt-0.5">{{ $card['label'] }}</p>
+        <p class="text-xl font-bold text-white">{{ number_format($feed->row_count) }}</p>
+        <p class="text-[11px] text-gray-600 mt-0.5">Total Products</p>
     </div>
-    @endforeach
+    <div class="glass rounded-xl p-4 text-center">
+        <p class="text-xl font-bold text-red-400" x-text="errorCount.toLocaleString()">{{ number_format($feed->error_count) }}</p>
+        <p class="text-[11px] text-gray-600 mt-0.5">Errors</p>
+    </div>
+    <div class="glass rounded-xl p-4 text-center">
+        <p class="text-xl font-bold text-yellow-400" x-text="warningCount.toLocaleString()">{{ number_format($feed->warning_count) }}</p>
+        <p class="text-[11px] text-gray-600 mt-0.5">Warnings</p>
+    </div>
+    <div class="glass rounded-xl p-4 text-center">
+        <p class="text-xl font-bold" :class="healthScoreColor()" x-text="healthScore() + '%'">{{ $feed->health_score }}%</p>
+        <p class="text-[11px] text-gray-600 mt-0.5">Health Score</p>
+    </div>
 </div>
 
 @elseif($feed->is_processing)
@@ -61,32 +85,37 @@
 </div>
 @endif
 
-{{-- Filter tabs --}}
-@if($rows->isNotEmpty())
-<div class="flex items-center gap-1.5 mb-4 text-xs">
-    <span class="text-gray-600">Showing</span>
-    <span class="px-2 py-1 rounded-md bg-white/5 text-gray-300 font-medium">
-        {{ $rows->total() }} rows
-    </span>
-    @if($feed->error_count > 0)
-    <span class="px-2 py-1 rounded-md bg-red-500/10 text-red-400 font-medium">
-        {{ $feed->error_count }} errors
-    </span>
+<div>
+    {{-- Filter tabs --}}
+    @if($rows->isNotEmpty())
+    <div class="flex items-center gap-1.5 mb-4 text-xs">
+        <span class="text-gray-600">Showing</span>
+        <span class="px-2 py-1 rounded-md bg-white/5 text-gray-300 font-medium">
+            {{ $rows->total() }} rows
+        </span>
+        <span x-show="errorCount > 0" x-cloak class="px-2 py-1 rounded-md bg-red-500/10 text-red-400 font-medium"
+              x-text="errorCount + (errorCount === 1 ? ' error' : ' errors')"></span>
+        <span x-show="warningCount > 0" x-cloak class="px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-400 font-medium"
+              x-text="warningCount + (warningCount === 1 ? ' warning' : ' warnings')"></span>
+        <span x-show="errorCount === 0 && warningCount === 0" x-cloak class="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 font-medium">
+            All fixed
+        </span>
+    </div>
     @endif
-    @if($feed->warning_count > 0)
-    <span class="px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-400 font-medium">
-        {{ $feed->warning_count }} warnings
-    </span>
-    @endif
-</div>
-@endif
 
-{{-- Rows --}}
-<div class="space-y-2">
+    {{-- Rows --}}
+    <div class="space-y-2">
     @forelse($rows as $row)
-    <div class="glass rounded-xl overflow-hidden"
+    <div class="glass rounded-xl overflow-hidden transition-colors"
+         :class="{
+             'border-emerald-500/30 bg-emerald-500/[0.06]': status === 'valid',
+             'border-yellow-500/20': status === 'warning',
+             'border-red-500/20': status === 'error'
+         }"
          x-data="{
              open: {{ $row->hasErrors() ? 'true' : 'false' }},
+             status: @js($row->status),
+             issues: @js($row->issues ?? []),
              aiLoading: false,
              aiSuccess: false,
              aiResult: @js($row->ai_fixed_data ? ['fixed_data' => $row->ai_fixed_data, 'suggestion' => $row->ai_suggestion] : null),
@@ -95,14 +124,15 @@
              autoRetryCount: 0,
              maxAutoRetries: 2,
              countdownTimer: null,
-             startCountdown() {
+             startCountdown(seconds = 62, errorMessage = null) {
                  if (this.autoRetryCount >= this.maxAutoRetries) {
                      this.rateLimitCountdown = 0;
-                     this.aiResult = { error: 'Rate limit hit ' + (this.maxAutoRetries + 1) + ' times. Click Try Again when ready.' };
+                     this.aiResult = { error: (errorMessage ? errorMessage + ' ' : '') + 'Automatic retries are exhausted. Click Try Again when ready.' };
                      return;
                  }
                  this.autoRetryCount++;
-                 this.rateLimitCountdown = 62;
+                 this.rateLimitCountdown = seconds;
+                 this.aiResult = errorMessage ? { error: errorMessage } : null;
                  if (this.countdownTimer) clearInterval(this.countdownTimer);
                  this.countdownTimer = setInterval(() => {
                      this.rateLimitCountdown--;
@@ -117,6 +147,7 @@
                  if (this.aiLoading || this.rateLimitCountdown > 0) return;
                  this.aiLoading = true;
                  this.aiSuccess = false;
+                 this.aiResult = null;
                  try {
                      const r = await fetch('{{ route('feeds.rows.ai-suggest', [$feed, $row]) }}', {
                          method: 'POST',
@@ -125,35 +156,65 @@
                              'Accept': 'application/json'
                          }
                      });
-                     if (r.status === 429) {
-                         this.aiLoading = false;
-                         this.startCountdown();
+                     const data = await r.json();
+                     if (r.status === 429 || data.retryable) {
+                         this.startCountdown(data.retry_after || (r.status === 429 ? 62 : 8), data.error);
                          return;
                      }
-                     const data = await r.json();
+                     if (! r.ok) {
+                         this.aiResult = { error: data.error || data.message || 'Unable to generate an AI fix.' };
+                         return;
+                     }
                      if (data.fixed_data) {
                          this.aiSuccess = true;
                          this.autoRetryCount = 0;
+                         this.aiResult = data;
+                         return;
                      }
-                     this.aiResult = data;
+                     this.aiResult = { error: data.error || 'Gemini did not return a usable fix. Try again.' };
                  } catch(e) {
                      this.aiResult = { error: e.message };
+                 } finally {
+                     this.aiLoading = false;
                  }
-                 this.aiLoading = false;
              },
              resetAndRetry() {
                  this.autoRetryCount = 0;
                  this.aiResult = null;
                  this.aiSuccess = false;
+                 this.rateLimitCountdown = 0;
+                 if (this.countdownTimer) clearInterval(this.countdownTimer);
                  this.getAi();
              },
              async applyFix() {
                  this.applying = true;
-                 await fetch('{{ route('feeds.rows.ai-apply', [$feed, $row]) }}', {
-                     method: 'POST',
-                     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content }
-                 });
-                 location.reload();
+                 try {
+                     const r = await fetch('{{ route('feeds.rows.ai-apply', [$feed, $row]) }}', {
+                         method: 'POST',
+                         headers: {
+                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                             'Accept': 'application/json'
+                         }
+                     });
+                     const data = await r.json();
+                     if (! r.ok) {
+                         this.aiResult = { error: data.message || 'Unable to apply AI fix.' };
+                         return;
+                     }
+                     const previousStatus = this.status;
+                     this.status = data.new_status;
+                     this.issues = data.issues || [];
+                     updateFeedStatusCounts(previousStatus, this.status);
+                     this.aiResult = null;
+                     this.aiSuccess = false;
+                     if (this.issues.length === 0) {
+                         this.open = false;
+                     }
+                 } catch(e) {
+                     this.aiResult = { error: e.message };
+                 } finally {
+                     this.applying = false;
+                 }
              }
          }">
 
@@ -162,10 +223,12 @@
                 @click="open = !open">
 
             {{-- Status dot --}}
-            <span class="w-2 h-2 rounded-full shrink-0
-                @if($row->status==='error') bg-red-500 shadow-sm shadow-red-500/50
-                @elseif($row->status==='warning') bg-yellow-500 shadow-sm shadow-yellow-500/50
-                @else bg-emerald-500 @endif">
+            <span class="w-2 h-2 rounded-full shrink-0"
+                  :class="status === 'error'
+                      ? 'bg-red-500 shadow-sm shadow-red-500/50'
+                      : (status === 'warning'
+                          ? 'bg-yellow-500 shadow-sm shadow-yellow-500/50'
+                          : 'bg-emerald-500 shadow-sm shadow-emerald-500/50')">
             </span>
 
             <span class="text-[11px] text-gray-600 w-14 shrink-0 tabular-nums">#{{ $row->row_number }}</span>
@@ -174,17 +237,15 @@
                 {{ Str::limit($row->field('title') ?: ($row->field('id') ?: 'Row ' . $row->row_number), 80) }}
             </span>
 
-            @if($row->issues && count($row->issues) > 0)
-            <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium
-                @if($row->status==='error') bg-red-500/15 text-red-400
-                @else bg-yellow-500/15 text-yellow-400 @endif">
-                {{ count($row->issues) }} {{ Str::plural('issue', count($row->issues)) }}
-            </span>
-            @endif
+            <template x-if="issues.length > 0">
+                <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      :class="status === 'error' ? 'bg-red-500/15 text-red-400' : 'bg-yellow-500/15 text-yellow-400'"
+                      x-text="issues.length + (issues.length === 1 ? ' issue' : ' issues')"></span>
+            </template>
 
-            @if($row->ai_applied)
-            <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">AI fixed</span>
-            @endif
+            <template x-if="status === 'valid'">
+                <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">All fixed</span>
+            </template>
 
             <svg class="w-4 h-4 text-gray-700 shrink-0 transition-transform duration-200" :class="open && 'rotate-180'"
                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,7 +259,7 @@
 
                 {{-- Issues --}}
                 @if($row->issues && count($row->issues) > 0)
-                <div>
+                <div x-show="issues.length > 0">
                     <p class="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2">Validation Issues</p>
                     <div class="space-y-1.5">
                         @foreach($row->issues as $issue)
@@ -219,7 +280,7 @@
 
                 {{-- AI Fix --}}
                 @if($row->hasErrors() || $row->hasWarnings())
-                <div class="border-t border-white/5 pt-4">
+                <div class="border-t border-white/5 pt-4" x-show="issues.length > 0">
                     <div class="flex items-center justify-between mb-3">
                         <p class="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">✦ Gemini AI Fix</p>
                         <button @click="getAi()" :disabled="aiLoading || rateLimitCountdown > 0"
@@ -260,8 +321,8 @@
                         <div class="flex items-center gap-3 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5">
                             <svg class="w-4 h-4 text-yellow-400 shrink-0 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <div class="flex-1">
-                                <p class="text-yellow-300 font-medium">Rate limited — waiting to retry</p>
-                                <p class="text-yellow-700 mt-0.5">Auto-retry <span class="text-yellow-500" x-text="autoRetryCount"></span>/<span x-text="maxAutoRetries"></span> fires in <span class="font-bold text-yellow-400" x-text="rateLimitCountdown"></span>s &mdash; free tier: 15 req/min</p>
+                                <p class="text-yellow-300 font-medium">Waiting to retry</p>
+                                <p class="text-yellow-700 mt-0.5">Auto-retry <span class="text-yellow-500" x-text="autoRetryCount"></span>/<span x-text="maxAutoRetries"></span> fires in <span class="font-bold text-yellow-400" x-text="rateLimitCountdown"></span>s</p>
                             </div>
                         </div>
                     </template>
@@ -292,10 +353,13 @@
     @empty
     <div class="text-center py-16 text-gray-600 text-sm">No rows found.</div>
     @endforelse
+    </div>
 </div>
 
 @if($rows->hasPages())
 <div class="mt-5">{{ $rows->links() }}</div>
 @endif
+
+</div>
 
 @endsection

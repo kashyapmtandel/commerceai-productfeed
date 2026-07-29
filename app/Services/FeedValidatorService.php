@@ -35,7 +35,7 @@ class FeedValidatorService
 
             match ($field) {
                 'link', 'image_link' => $this->validateUrl($value, $field, $label, $errors, $warnings),
-                'price'              => $this->validatePrice($value, $field, $errors, $warnings),
+                'price'              => $this->validatePrice($value, $field, $row, $errors, $warnings),
                 'availability'       => $this->validateAvailability($value, $field, $errors),
                 'title'              => $this->validateTitle($value, $field, $warnings),
                 'description'        => $this->validateDescription($value, $field, $warnings),
@@ -88,7 +88,7 @@ class FeedValidatorService
         }
     }
 
-    private function validatePrice(string $value, string $field, array &$errors, array &$warnings): void
+    private function validatePrice(string $value, string $field, array $row, array &$errors, array &$warnings): void
     {
         if (! preg_match('/^\$?[\d,]+(\.\d{1,2})?(\s+[A-Z]{3})?$/', $value)) {
             $errors[] = $this->issue($field, 'error',
@@ -102,10 +102,15 @@ class FeedValidatorService
             $errors[] = $this->issue($field, 'error', 'Price must be greater than 0.');
         }
 
-        if (! preg_match('/[A-Z]{3}/', $value)) {
+        if (! $this->isMagentoRow($row) && ! preg_match('/[A-Z]{3}/', $value)) {
             $warnings[] = $this->issue($field, 'warning',
                 'Price is missing a currency code (e.g., "19.99 USD"). Required for multi-country feeds.');
         }
+    }
+
+    private function isMagentoRow(array $row): bool
+    {
+        return isset($row['sku'], $row['attribute_set_code'], $row['product_type'], $row['product_websites']);
     }
 
     private function validateAvailability(string $value, string $field, array &$errors): void

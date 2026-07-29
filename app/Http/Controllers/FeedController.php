@@ -80,7 +80,7 @@ class FeedController extends Controller
 
             $feed->rows()->orderBy('row_number')->chunk(200, function ($rows) use ($handle, &$first) {
                 foreach ($rows as $row) {
-                    $data = $row->getEffectiveData();
+                    $data = $this->prepareExportRow($row->getEffectiveData());
                     if ($first) {
                         fputcsv($handle, array_keys($data));
                         $first = false;
@@ -91,6 +91,31 @@ class FeedController extends Controller
 
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function prepareExportRow(array $data): array
+    {
+        if ($this->isMagentoRow($data) && isset($data['price'])) {
+            $data['price'] = $this->normalizeMagentoPrice($data['price']);
+        }
+
+        return $data;
+    }
+
+    private function isMagentoRow(array $data): bool
+    {
+        return isset($data['sku'], $data['attribute_set_code'], $data['product_type'], $data['product_websites']);
+    }
+
+    private function normalizeMagentoPrice(mixed $price): string
+    {
+        $value = trim((string) $price);
+
+        if (preg_match('/^\$?\s*([\d,]+(?:\.\d{1,4})?)(?:\s+[A-Z]{3})?$/', $value, $matches)) {
+            return str_replace(',', '', $matches[1]);
+        }
+
+        return $value;
     }
 
     public function destroy(Feed $feed)

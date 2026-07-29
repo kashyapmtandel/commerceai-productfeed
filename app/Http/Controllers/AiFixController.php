@@ -28,10 +28,16 @@ class AiFixController extends Controller
         $result = $this->gemini->suggestFix($row->data, $row->issues);
 
         if (isset($result['error'])) {
-            $isRateLimit = str_contains($result['error'], 'rate limit');
+            $isRateLimit = str_contains(strtolower($result['error']), 'rate limit');
+            $status = $result['status'] ?? ($isRateLimit ? 429 : (($result['retryable'] ?? false) ? 503 : 502));
             return response()->json(
-                ['error' => $result['error'], 'rate_limited' => $isRateLimit],
-                $isRateLimit ? 429 : 500
+                [
+                    'error' => $result['error'],
+                    'rate_limited' => $isRateLimit,
+                    'retryable' => $result['retryable'] ?? $isRateLimit,
+                    'retry_after' => $result['retry_after'] ?? null,
+                ],
+                $status
             );
         }
 
@@ -57,7 +63,7 @@ class AiFixController extends Controller
         }
 
         // Save the fixed data
-        $fixedData = $row->ai_fixed_data;
+        $fixedData = $this->prepareAiFixedData($row);
         $row->update(['fixed_data' => $fixedData, 'ai_applied' => true]);
 
         // Re-validate the fixed data so status + issues reflect the actual state
@@ -73,7 +79,10 @@ class AiFixController extends Controller
         return response()->json([
             'message'      => 'AI fix applied and row re-validated.',
             'new_status'   => $validation['status'],
+            'issues'       => $validation['issues'],
             'issue_count'  => count($validation['issues']),
+            'fixed_data'   => $fixedData,
+            'ai_applied'   => true,
         ]);
     }
 
@@ -113,5 +122,18 @@ class AiFixController extends Controller
             'warning_count' => $feed->rows()->where('status', 'warning')->count(),
         ]);
     }
-}
 
+    private function prepareAiFixedData(FeedRow $row): array
+    {
+        $fixedData = $row->ai_fixed_data;
+
+        $hasGtin = trim((string) ($fixedData['gtin'] ?? '')) !== '';
+        $hasMpn = trim((string) ($fixedData['mpn'] ?? '')) !== '';
+
+        if (! $hasGtin && ! $hasMpn && isset($fixedData['id'])) {
+            $fixedData['mpn'] = (string) $fixedData['id'];
+        }
+
+        return $fixedData;
+    }
+}
